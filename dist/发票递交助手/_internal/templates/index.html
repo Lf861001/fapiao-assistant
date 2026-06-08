@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>发票递交助手</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+      --ink: #17202a;
+      --muted: #667085;
+      --line: #d8dee6;
+      --panel: #ffffff;
+      --soft: #f5f7fa;
+      --accent: #1677ff;
+      --accent-dark: #0958d9;
+      --danger: #c2410c;
+      --ok: #047857;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #eef2f6;
+      color: var(--ink);
+    }
+
+    header {
+      background: #243447;
+      color: #fff;
+      padding: 22px 32px;
+      border-bottom: 4px solid #5cb85c;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    header p {
+      margin: 0;
+      color: #d9e2ec;
+      font-size: 14px;
+    }
+
+    main {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 24px auto 40px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 18px;
+      align-items: start;
+    }
+
+    section, aside {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 8px 24px rgba(16, 24, 40, 0.06);
+    }
+
+    h2 {
+      margin: 0 0 16px;
+      font-size: 18px;
+    }
+
+    form {
+      display: grid;
+      gap: 18px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 7px;
+    }
+
+    input, select {
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid #c9d2dc;
+      border-radius: 6px;
+      padding: 9px 11px;
+      font-size: 15px;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    input[type="file"] {
+      min-height: 92px;
+      padding: 18px;
+      background: var(--soft);
+      border-style: dashed;
+    }
+
+    .hidden-file {
+      display: none;
+    }
+
+    .hint {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .invoice-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 42px;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .attachment-panel {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px dashed #c9d2dc;
+      border-radius: 8px;
+      background: var(--soft);
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .attachment-panel.drag-over {
+      border-color: var(--accent);
+      background: #eef6ff;
+    }
+
+    .attachment-list {
+      display: grid;
+      gap: 8px;
+      min-height: 42px;
+    }
+
+    .attachment-item {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 42px;
+      gap: 8px;
+      align-items: center;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+    }
+
+    .attachment-name {
+      overflow-wrap: anywhere;
+      font-size: 13px;
+      color: #243447;
+    }
+
+    button {
+      border: 0;
+      border-radius: 6px;
+      min-height: 42px;
+      padding: 0 16px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:disabled, input:disabled, select:disabled {
+      cursor: not-allowed;
+      opacity: 0.65;
+    }
+
+    .primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .primary:hover { background: var(--accent-dark); }
+
+    .secondary {
+      background: #e7edf3;
+      color: #243447;
+      border: 1px solid #cbd5df;
+    }
+
+    .ghost {
+      background: #fff;
+      color: #243447;
+      border: 1px solid #cbd5df;
+    }
+
+    .remove {
+      padding: 0;
+      background: #fff1f0;
+      color: #a8071a;
+      border: 1px solid #ffccc7;
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .status {
+      display: none;
+      padding: 12px 14px;
+      border-radius: 6px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .status.show { display: block; }
+    .status.ok { background: #ecfdf5; color: var(--ok); border: 1px solid #a7f3d0; }
+    .status.error { background: #fff7ed; color: var(--danger); border: 1px solid #fed7aa; }
+
+    .rules {
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 13px;
+      line-height: 1.7;
+      color: #344054;
+    }
+
+    .rules code {
+      display: block;
+      margin-top: 6px;
+      overflow-wrap: anywhere;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 8px;
+      color: #111827;
+    }
+
+    .file-list {
+      display: grid;
+      gap: 8px;
+      margin: 12px 0 18px;
+      min-height: 42px;
+    }
+
+    .file-item {
+      display: block;
+      padding: 10px 11px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: #0958d9;
+      text-decoration: none;
+      overflow-wrap: anywhere;
+      background: #fbfdff;
+      font-size: 13px;
+    }
+
+    .empty {
+      color: var(--muted);
+      font-size: 13px;
+      padding: 10px 0;
+    }
+
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>发票递交助手</h1>
+    <p>一个合同生成一个递交 PDF，发票在前，送货单在后。</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>合同递交文件</h2>
+      <form id="contractForm">
+        <div class="grid">
+          <div>
+            <label for="companyCode">公司代码</label>
+            <select id="companyCode" name="companyCode" required>
+              <option value="1219">1219 - 柯马(上海)工程有限公司</option>
+              <option value="1226">1226 - 柯马(上海)国际贸易有限公司</option>
+              <option value="1227">1227 - 柯昆(昆山)自动化有限公司</option>
+            </select>
+          </div>
+          <div>
+            <label for="supplierCode">供应商代码</label>
+            <input id="supplierCode" name="supplierCode" placeholder="例如：855212" required>
+          </div>
+          <div>
+            <label for="poNumber">合同号 / 采购订单号 PO</label>
+            <input id="poNumber" name="poNumber" placeholder="例如：10594472" required>
+          </div>
+          <div>
+            <label>发票号</label>
+            <div id="invoiceRows">
+              <div class="invoice-row">
+                <input name="invoiceNumbers[]" placeholder="例如：65607584" required>
+                <button class="remove" type="button" title="删除发票号" aria-label="删除发票号">×</button>
+              </div>
+            </div>
+            <button class="secondary" id="addInvoice" type="button">添加发票号</button>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div>
+            <label>发票附件</label>
+            <div class="attachment-panel" id="invoiceDropZone">
+              <button class="secondary" id="addInvoiceFile" type="button">添加发票附件</button>
+              <div id="invoiceFileList" class="attachment-list">
+                <div class="empty">暂无发票附件</div>
+              </div>
+            </div>
+            <input class="hidden-file" id="invoiceFiles" type="file" accept="application/pdf,.pdf" multiple>
+            <p class="hint">可点击添加，也可拖入 PDF；发票附件文件名必须包含至少一个已填写的发票号。</p>
+          </div>
+          <div>
+            <label>送货单附件</label>
+            <div class="attachment-panel" id="deliveryDropZone">
+              <button class="secondary" id="addDeliveryFile" type="button">添加送货单附件</button>
+              <div id="deliveryFileList" class="attachment-list">
+                <div class="empty">暂无送货单附件</div>
+              </div>
+            </div>
+            <input class="hidden-file" id="deliveryFiles" type="file" accept="application/pdf,.pdf" multiple>
+            <p class="hint">可点击添加，也可拖入 PDF；生成时排在发票之后。</p>
+          </div>
+        </div>
+
+        <div class="rules">
+          单张发票命名示例：
+          <code>1219_855212_10594472_65607584.pdf</code>
+          多张连续发票会自动压缩命名：
+          <code>65607584、65607585、65607586、65607588、65607589 → 1219_855212_10594472_65607584-86&65607588-89.pdf</code>
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <div class="actions">
+          <button class="primary" type="submit">生成递交 PDF</button>
+          <button class="secondary" id="nextContract" type="button">下一个合同</button>
+          <button class="ghost" id="clearOutput" type="button">清空输出文件夹</button>
+        </div>
+      </form>
+    </section>
+
+    <aside>
+      <h2>输出文件夹</h2>
+      <div id="fileList" class="file-list">
+        <div class="empty">暂无文件</div>
+      </div>
+      <div class="actions">
+        <a href="/api/download-all" id="downloadAll">
+          <button class="primary" type="button">批量下载 ZIP</button>
+        </a>
+      </div>
+      <p class="hint">启动工具时会自动清空输出文件夹。本次生成的所有合同文件会保存在这里。</p>
+    </aside>
+  </main>
+
+  <script>
+    const form = document.querySelector("#contractForm");
+    const invoiceRows = document.querySelector("#invoiceRows");
+    const statusBox = document.querySelector("#status");
+    const fileList = document.querySelector("#fileList");
+    const invoiceFilesInput = document.querySelector("#invoiceFiles");
+    const deliveryFilesInput = document.querySelector("#deliveryFiles");
+    const invoiceDropZone = document.querySelector("#invoiceDropZone");
+    const deliveryDropZone = document.querySelector("#deliveryDropZone");
+    const invoiceFileList = document.querySelector("#invoiceFileList");
+    const deliveryFileList = document.querySelector("#deliveryFileList");
+    const selectedFiles = {
+      invoiceFiles: [],
+      deliveryFiles: []
+    };
+    let contractLocked = false;
+
+    function showStatus(message, type = "ok") {
+      statusBox.textContent = message;
+      statusBox.className = `status show ${type}`;
+    }
+
+    function resetStatus() {
+      statusBox.textContent = "";
+      statusBox.className = "status";
+    }
+
+    function addInvoiceRow(value = "") {
+      if (contractLocked) return;
+      const row = document.createElement("div");
+      row.className = "invoice-row";
+      row.innerHTML = `
+        <input name="invoiceNumbers[]" placeholder="例如：65607584" required>
+        <button class="remove" type="button" title="删除发票号" aria-label="删除发票号">×</button>
+      `;
+      row.querySelector("input").value = value;
+      invoiceRows.appendChild(row);
+    }
+
+    function isPdf(file) {
+      return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    }
+
+    function getInvoiceNumbers() {
+      return [...form.querySelectorAll("input[name='invoiceNumbers[]']")]
+        .map((input) => input.value.trim())
+        .filter(Boolean);
+    }
+
+    function fileNameIncludesInvoiceNumber(file, invoiceNumbers) {
+      return invoiceNumbers.some((invoiceNumber) => file.name.includes(invoiceNumber));
+    }
+
+    function addAttachmentFiles(kind, files) {
+      if (contractLocked) return;
+      const incomingFiles = [...files];
+      if (!incomingFiles.length) return;
+      const invalidFile = incomingFiles.find((file) => !isPdf(file));
+      if (invalidFile) {
+        showStatus(`只能添加 PDF 文件：${invalidFile.name}`, "error");
+        return;
+      }
+      if (kind === "invoiceFiles") {
+        const invoiceNumbers = getInvoiceNumbers();
+        if (!invoiceNumbers.length) {
+          showStatus("请先填写至少一个发票号，再添加发票附件。", "error");
+          return;
+        }
+        const unmatchedFile = incomingFiles.find((file) => !fileNameIncludesInvoiceNumber(file, invoiceNumbers));
+        if (unmatchedFile) {
+          showStatus(`发票附件文件名必须包含至少一个已填写的发票号：${unmatchedFile.name}`, "error");
+          return;
+        }
+      }
+      selectedFiles[kind].push(...incomingFiles);
+      renderAttachmentList(kind);
+      resetStatus();
+    }
+
+    function removeAttachmentFile(kind, index) {
+      if (contractLocked) return;
+      selectedFiles[kind].splice(index, 1);
+      renderAttachmentList(kind);
+    }
+
+    function renderAttachmentList(kind) {
+      const target = kind === "invoiceFiles" ? invoiceFileList : deliveryFileList;
+      const emptyText = kind === "invoiceFiles" ? "暂无发票附件" : "暂无送货单附件";
+      target.innerHTML = "";
+
+      if (!selectedFiles[kind].length) {
+        target.innerHTML = `<div class="empty">${emptyText}</div>`;
+        return;
+      }
+
+      selectedFiles[kind].forEach((file, index) => {
+        const item = document.createElement("div");
+        item.className = "attachment-item";
+        item.innerHTML = `
+          <span class="attachment-name">${index + 1}. ${file.name}</span>
+          <button class="remove" type="button" title="删除附件" aria-label="删除附件">×</button>
+        `;
+        item.querySelector("button").addEventListener("click", () => removeAttachmentFile(kind, index));
+        target.appendChild(item);
+      });
+    }
+
+    function resetAttachments() {
+      selectedFiles.invoiceFiles = [];
+      selectedFiles.deliveryFiles = [];
+      invoiceFilesInput.value = "";
+      deliveryFilesInput.value = "";
+      renderAttachmentList("invoiceFiles");
+      renderAttachmentList("deliveryFiles");
+    }
+
+    function buildFormData() {
+      const data = new FormData();
+      data.append("companyCode", document.querySelector("#companyCode").value);
+      data.append("supplierCode", document.querySelector("#supplierCode").value);
+      data.append("poNumber", document.querySelector("#poNumber").value);
+
+      form.querySelectorAll("input[name='invoiceNumbers[]']").forEach((input) => {
+        if (input.value.trim()) data.append("invoiceNumbers[]", input.value.trim());
+      });
+      selectedFiles.invoiceFiles.forEach((file) => data.append("invoiceFiles", file, file.name));
+      selectedFiles.deliveryFiles.forEach((file) => data.append("deliveryFiles", file, file.name));
+      return data;
+    }
+
+    function setContractLocked(locked) {
+      contractLocked = locked;
+      const controls = form.querySelectorAll("input, select, button");
+      controls.forEach((control) => {
+        if (control.id === "nextContract" || control.id === "clearOutput") return;
+        control.disabled = locked;
+      });
+    }
+
+    invoiceRows.addEventListener("click", (event) => {
+      if (contractLocked) return;
+      if (!event.target.classList.contains("remove")) return;
+      const rows = invoiceRows.querySelectorAll(".invoice-row");
+      if (rows.length === 1) {
+        rows[0].querySelector("input").value = "";
+        return;
+      }
+      event.target.closest(".invoice-row").remove();
+    });
+
+    document.querySelector("#addInvoice").addEventListener("click", () => addInvoiceRow());
+    document.querySelector("#addInvoiceFile").addEventListener("click", () => invoiceFilesInput.click());
+    document.querySelector("#addDeliveryFile").addEventListener("click", () => deliveryFilesInput.click());
+    invoiceFilesInput.addEventListener("change", () => {
+      addAttachmentFiles("invoiceFiles", invoiceFilesInput.files);
+      invoiceFilesInput.value = "";
+    });
+    deliveryFilesInput.addEventListener("change", () => {
+      addAttachmentFiles("deliveryFiles", deliveryFilesInput.files);
+      deliveryFilesInput.value = "";
+    });
+
+    function setupDropZone(zone, kind) {
+      ["dragenter", "dragover"].forEach((eventName) => {
+        zone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          if (!contractLocked) zone.classList.add("drag-over");
+        });
+      });
+
+      ["dragleave", "drop"].forEach((eventName) => {
+        zone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          zone.classList.remove("drag-over");
+        });
+      });
+
+      zone.addEventListener("drop", (event) => {
+        if (contractLocked) return;
+        addAttachmentFiles(kind, event.dataTransfer.files);
+      });
+    }
+
+    setupDropZone(invoiceDropZone, "invoiceFiles");
+    setupDropZone(deliveryDropZone, "deliveryFiles");
+
+    document.querySelector("#nextContract").addEventListener("click", () => {
+      const companyCode = document.querySelector("#companyCode").value;
+      setContractLocked(false);
+      form.reset();
+      document.querySelector("#companyCode").value = companyCode;
+      invoiceRows.innerHTML = "";
+      addInvoiceRow();
+      resetAttachments();
+      resetStatus();
+      document.querySelector("#supplierCode").focus();
+    });
+
+    document.querySelector("#clearOutput").addEventListener("click", async () => {
+      const response = await fetch("/api/clear", { method: "POST" });
+      const result = await response.json();
+      showStatus(result.message, result.ok ? "ok" : "error");
+      await refreshFiles();
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (contractLocked) return;
+      resetStatus();
+      const invoiceNumberCount = [...form.querySelectorAll("input[name='invoiceNumbers[]']")]
+        .filter((input) => input.value.trim()).length;
+      const invoiceFileCount = selectedFiles.invoiceFiles.length;
+      if (invoiceNumberCount !== invoiceFileCount) {
+        showStatus(`发票号数量必须和发票 PDF 数量一致。当前发票号 ${invoiceNumberCount} 个，发票 PDF ${invoiceFileCount} 个。`, "error");
+        return;
+      }
+      if (!selectedFiles.deliveryFiles.length) {
+        showStatus("请至少添加一个送货单 PDF。", "error");
+        return;
+      }
+      const button = form.querySelector("button[type='submit']");
+      button.disabled = true;
+      button.textContent = "生成中...";
+
+      try {
+        const response = await fetch("/api/generate", {
+          method: "POST",
+          body: buildFormData()
+        });
+        const result = await response.json();
+        showStatus(result.message + (result.fileName ? ` 文件：${result.fileName}` : ""), result.ok ? "ok" : "error");
+        if (result.ok) {
+          setContractLocked(true);
+          await refreshFiles();
+        }
+      } catch (error) {
+        showStatus(`生成失败：${error}`, "error");
+      } finally {
+        button.disabled = contractLocked;
+        button.textContent = "生成递交 PDF";
+      }
+    });
+
+    async function refreshFiles() {
+      const response = await fetch("/api/files");
+      const result = await response.json();
+      fileList.innerHTML = "";
+
+      if (!result.files.length) {
+        fileList.innerHTML = '<div class="empty">暂无文件</div>';
+        return;
+      }
+
+      for (const fileName of result.files) {
+        const link = document.createElement("a");
+        link.className = "file-item";
+        link.href = `/output/${encodeURIComponent(fileName)}`;
+        link.textContent = fileName;
+        fileList.appendChild(link);
+      }
+    }
+
+    refreshFiles();
+  </script>
+</body>
+</html>

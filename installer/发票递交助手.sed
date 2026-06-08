@@ -1,0 +1,45 @@
+[Version]
+Class=IEXPRESS
+SEDVersion=3
+[Options]
+PackagePurpose=InstallApp
+ShowInstallProgramWindow=1
+HideExtractAnimation=0
+UseLongFileName=1
+InsideCompressed=0
+CAB_FixedSize=0
+CAB_ResvCodeSigning=0
+RebootMode=N
+InstallPrompt=%InstallPrompt%
+DisplayLicense=%DisplayLicense%
+FinishMessage=%FinishMessage%
+TargetName=%TargetName%
+FriendlyName=%FriendlyName%
+AppLaunched=%AppLaunched%
+PostInstallCmd=%PostInstallCmd%
+AdminQuietInstCmd=%AdminQuietInstCmd%
+UserQuietInstCmd=%UserQuietInstCmd%
+SourceFiles=SourceFiles
+[Strings]
+InstallPrompt=即将安装发票递交助手。
+DisplayLicense=
+FinishMessage=
+TargetName=C:\Users\NuoHe\Documents\fapiao 整理小助手\installer\output\发票递交助手安装包.exe
+FriendlyName=发票递交助手安装包
+AppLaunched=launch_install.cmd
+PostInstallCmd=<None>
+AdminQuietInstCmd=launch_install.cmd
+UserQuietInstCmd=launch_install.cmd
+FILE0=launch_install.cmd
+FILE1=install.ps1
+FILE2=README_桌面版使用说明.txt
+FILE3=发票递交助手.exe
+[SourceFiles]
+SourceFiles0=C:\Users\NuoHe\Documents\fapiao 整理小助手\installer\staging\
+SourceFiles1=C:\Users\NuoHe\Documents\fapiao 整理小助手\installer\staging\发票递交助手\
+[SourceFiles0]
+%FILE0%=
+%FILE1%=
+[SourceFiles1]
+%FILE2%=
+%FILE3%=

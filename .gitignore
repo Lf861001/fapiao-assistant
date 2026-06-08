@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+
+.tmp_uploads/
+output/
+
+build/
+installer/staging/
+installer/payload/
+
+.DS_Store
+Thumbs.db
