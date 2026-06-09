@@ -116,13 +116,6 @@
       line-height: 1.6;
     }
 
-    .invoice-row {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 42px;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
     .attachment-panel {
       display: grid;
       gap: 10px;
@@ -144,7 +137,8 @@
       min-height: 42px;
     }
 
-    .attachment-item {
+    .attachment-item,
+    .file-item {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 42px;
       gap: 8px;
@@ -155,10 +149,16 @@
       background: #fff;
     }
 
-    .attachment-name {
+    .attachment-name,
+    .file-link {
       overflow-wrap: anywhere;
       font-size: 13px;
       color: #243447;
+    }
+
+    .file-link {
+      color: #0958d9;
+      text-decoration: none;
     }
 
     button {
@@ -189,12 +189,6 @@
       border: 1px solid #cbd5df;
     }
 
-    .ghost {
-      background: #fff;
-      color: #243447;
-      border: 1px solid #cbd5df;
-    }
-
     .remove {
       padding: 0;
       background: #fff1f0;
@@ -202,6 +196,7 @@
       border: 1px solid #ffccc7;
       font-size: 20px;
       line-height: 1;
+      min-height: 36px;
     }
 
     .actions {
@@ -250,18 +245,6 @@
       min-height: 42px;
     }
 
-    .file-item {
-      display: block;
-      padding: 10px 11px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      color: #0958d9;
-      text-decoration: none;
-      overflow-wrap: anywhere;
-      background: #fbfdff;
-      font-size: 13px;
-    }
-
     .empty {
       color: var(--muted);
       font-size: 13px;
@@ -293,9 +276,9 @@
           <div>
             <label for="companyCode">公司代码</label>
             <select id="companyCode" name="companyCode" required>
-              <option value="1219">1219 - 柯马(上海)工程有限公司</option>
-              <option value="1226">1226 - 柯马(上海)国际贸易有限公司</option>
-              <option value="1227">1227 - 柯昆(昆山)自动化有限公司</option>
+              {% for code, name in companies.items() %}
+              <option value="{{ code }}">{{ code }} - {{ name }}</option>
+              {% endfor %}
             </select>
           </div>
           <div>
@@ -305,16 +288,6 @@
           <div>
             <label for="poNumber">合同号 / 采购订单号 PO</label>
             <input id="poNumber" name="poNumber" placeholder="例如：10594472" required>
-          </div>
-          <div>
-            <label>发票号</label>
-            <div id="invoiceRows">
-              <div class="invoice-row">
-                <input name="invoiceNumbers[]" placeholder="例如：65607584" required>
-                <button class="remove" type="button" title="删除发票号" aria-label="删除发票号">×</button>
-              </div>
-            </div>
-            <button class="secondary" id="addInvoice" type="button">添加发票号</button>
           </div>
         </div>
 
@@ -328,7 +301,7 @@
               </div>
             </div>
             <input class="hidden-file" id="invoiceFiles" type="file" accept="application/pdf,.pdf" multiple>
-            <p class="hint">可点击添加，也可拖入 PDF；发票附件文件名必须包含至少一个已填写的发票号。</p>
+            <p class="hint">可点击添加，也可拖入 PDF；系统会从每个发票 PDF 文件名中提取连续 20 位数字作为发票号，并在上传时检查是否重复。</p>
           </div>
           <div>
             <label>送货单附件</label>
@@ -344,10 +317,10 @@
         </div>
 
         <div class="rules">
-          单张发票命名示例：
-          <code>1219_855212_10594472_65607584.pdf</code>
-          多张连续发票会自动压缩命名：
-          <code>65607584、65607585、65607586、65607588、65607589 → 1219_855212_10594472_65607584-86&65607588-89.pdf</code>
+          发票 PDF 文件名示例：
+          <code>invoice_12345678901234567890.pdf</code>
+          生成文件名示例：
+          <code>1219_855212_10594472_12345678901234567890.pdf</code>
         </div>
 
         <div id="status" class="status"></div>
@@ -355,7 +328,6 @@
         <div class="actions">
           <button class="primary" type="submit">生成递交 PDF</button>
           <button class="secondary" id="nextContract" type="button">下一个合同</button>
-          <button class="ghost" id="clearOutput" type="button">清空输出文件夹</button>
         </div>
       </form>
     </section>
@@ -370,13 +342,12 @@
           <button class="primary" type="button">批量下载 ZIP</button>
         </a>
       </div>
-      <p class="hint">启动工具时会自动清空输出文件夹。本次生成的所有合同文件会保存在这里。</p>
+      <p class="hint">启动工具时会自动清空输出文件夹。点击“批量下载 ZIP”后，已生成的文件会自动从输出文件夹清空；也可以在右侧逐个删除。</p>
     </aside>
   </main>
 
   <script>
     const form = document.querySelector("#contractForm");
-    const invoiceRows = document.querySelector("#invoiceRows");
     const statusBox = document.querySelector("#status");
     const fileList = document.querySelector("#fileList");
     const invoiceFilesInput = document.querySelector("#invoiceFiles");
@@ -385,9 +356,14 @@
     const deliveryDropZone = document.querySelector("#deliveryDropZone");
     const invoiceFileList = document.querySelector("#invoiceFileList");
     const deliveryFileList = document.querySelector("#deliveryFileList");
+    const downloadAllLink = document.querySelector("#downloadAll");
     const selectedFiles = {
       invoiceFiles: [],
       deliveryFiles: []
+    };
+    const outputState = {
+      invoiceNumbers: new Set(),
+      poNumbers: new Set()
     };
     let contractLocked = false;
 
@@ -401,53 +377,58 @@
       statusBox.className = "status";
     }
 
-    function addInvoiceRow(value = "") {
-      if (contractLocked) return;
-      const row = document.createElement("div");
-      row.className = "invoice-row";
-      row.innerHTML = `
-        <input name="invoiceNumbers[]" placeholder="例如：65607584" required>
-        <button class="remove" type="button" title="删除发票号" aria-label="删除发票号">×</button>
-      `;
-      row.querySelector("input").value = value;
-      invoiceRows.appendChild(row);
-    }
-
     function isPdf(file) {
       return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
     }
 
-    function getInvoiceNumbers() {
-      return [...form.querySelectorAll("input[name='invoiceNumbers[]']")]
-        .map((input) => input.value.trim())
-        .filter(Boolean);
+    function extractInvoiceNumberFromFileName(fileName) {
+      const match = fileName.match(/(^|\D)(\d{20})(\D|$)/);
+      return match ? match[2] : null;
     }
 
-    function fileNameIncludesInvoiceNumber(file, invoiceNumbers) {
-      return invoiceNumbers.some((invoiceNumber) => file.name.includes(invoiceNumber));
+    async function refreshOutputState() {
+      const response = await fetch("/api/output-state");
+      const result = await response.json();
+      outputState.invoiceNumbers = new Set(result.invoiceNumbers || []);
+      outputState.poNumbers = new Set(result.poNumbers || []);
+      return result;
     }
 
-    function addAttachmentFiles(kind, files) {
+    async function addAttachmentFiles(kind, files) {
       if (contractLocked) return;
       const incomingFiles = [...files];
       if (!incomingFiles.length) return;
+
       const invalidFile = incomingFiles.find((file) => !isPdf(file));
       if (invalidFile) {
         showStatus(`只能添加 PDF 文件：${invalidFile.name}`, "error");
         return;
       }
+
       if (kind === "invoiceFiles") {
-        const invoiceNumbers = getInvoiceNumbers();
-        if (!invoiceNumbers.length) {
-          showStatus("请先填写至少一个发票号，再添加发票附件。", "error");
-          return;
-        }
-        const unmatchedFile = incomingFiles.find((file) => !fileNameIncludesInvoiceNumber(file, invoiceNumbers));
-        if (unmatchedFile) {
-          showStatus(`发票附件文件名必须包含至少一个已填写的发票号：${unmatchedFile.name}`, "error");
-          return;
+        await refreshOutputState();
+        const invoiceNumbersInSelection = selectedFiles.invoiceFiles
+          .map((file) => extractInvoiceNumberFromFileName(file.name))
+          .filter(Boolean);
+
+        for (const file of incomingFiles) {
+          const invoiceNumber = extractInvoiceNumberFromFileName(file.name);
+          if (!invoiceNumber) {
+            showStatus(`发票 PDF 文件名中必须包含连续 20 位数字发票号：${file.name}`, "error");
+            return;
+          }
+          if (outputState.invoiceNumbers.has(invoiceNumber)) {
+            showStatus(`发票号已在输出文件夹中生成过递交 PDF，不能重复上传：${invoiceNumber}`, "error");
+            return;
+          }
+          if (invoiceNumbersInSelection.includes(invoiceNumber)) {
+            showStatus(`发票号不能重复上传：${invoiceNumber}`, "error");
+            return;
+          }
+          invoiceNumbersInSelection.push(invoiceNumber);
         }
       }
+
       selectedFiles[kind].push(...incomingFiles);
       renderAttachmentList(kind);
       resetStatus();
@@ -495,10 +476,6 @@
       data.append("companyCode", document.querySelector("#companyCode").value);
       data.append("supplierCode", document.querySelector("#supplierCode").value);
       data.append("poNumber", document.querySelector("#poNumber").value);
-
-      form.querySelectorAll("input[name='invoiceNumbers[]']").forEach((input) => {
-        if (input.value.trim()) data.append("invoiceNumbers[]", input.value.trim());
-      });
       selectedFiles.invoiceFiles.forEach((file) => data.append("invoiceFiles", file, file.name));
       selectedFiles.deliveryFiles.forEach((file) => data.append("deliveryFiles", file, file.name));
       return data;
@@ -508,31 +485,31 @@
       contractLocked = locked;
       const controls = form.querySelectorAll("input, select, button");
       controls.forEach((control) => {
-        if (control.id === "nextContract" || control.id === "clearOutput") return;
+        if (control.id === "nextContract") return;
         control.disabled = locked;
       });
     }
 
-    invoiceRows.addEventListener("click", (event) => {
-      if (contractLocked) return;
-      if (!event.target.classList.contains("remove")) return;
-      const rows = invoiceRows.querySelectorAll(".invoice-row");
-      if (rows.length === 1) {
-        rows[0].querySelector("input").value = "";
-        return;
-      }
-      event.target.closest(".invoice-row").remove();
-    });
+    function moveToNextContract() {
+      const companyCode = document.querySelector("#companyCode").value;
+      const supplierCode = document.querySelector("#supplierCode").value;
+      setContractLocked(false);
+      form.reset();
+      document.querySelector("#companyCode").value = companyCode;
+      document.querySelector("#supplierCode").value = supplierCode;
+      resetAttachments();
+      resetStatus();
+      document.querySelector("#poNumber").focus();
+    }
 
-    document.querySelector("#addInvoice").addEventListener("click", () => addInvoiceRow());
     document.querySelector("#addInvoiceFile").addEventListener("click", () => invoiceFilesInput.click());
     document.querySelector("#addDeliveryFile").addEventListener("click", () => deliveryFilesInput.click());
-    invoiceFilesInput.addEventListener("change", () => {
-      addAttachmentFiles("invoiceFiles", invoiceFilesInput.files);
+    invoiceFilesInput.addEventListener("change", async () => {
+      await addAttachmentFiles("invoiceFiles", invoiceFilesInput.files);
       invoiceFilesInput.value = "";
     });
-    deliveryFilesInput.addEventListener("change", () => {
-      addAttachmentFiles("deliveryFiles", deliveryFilesInput.files);
+    deliveryFilesInput.addEventListener("change", async () => {
+      await addAttachmentFiles("deliveryFiles", deliveryFilesInput.files);
       deliveryFilesInput.value = "";
     });
 
@@ -551,9 +528,9 @@
         });
       });
 
-      zone.addEventListener("drop", (event) => {
+      zone.addEventListener("drop", async (event) => {
         if (contractLocked) return;
-        addAttachmentFiles(kind, event.dataTransfer.files);
+        await addAttachmentFiles(kind, event.dataTransfer.files);
       });
     }
 
@@ -561,39 +538,37 @@
     setupDropZone(deliveryDropZone, "deliveryFiles");
 
     document.querySelector("#nextContract").addEventListener("click", () => {
-      const companyCode = document.querySelector("#companyCode").value;
-      setContractLocked(false);
-      form.reset();
-      document.querySelector("#companyCode").value = companyCode;
-      invoiceRows.innerHTML = "";
-      addInvoiceRow();
-      resetAttachments();
-      resetStatus();
-      document.querySelector("#supplierCode").focus();
+      moveToNextContract();
     });
 
-    document.querySelector("#clearOutput").addEventListener("click", async () => {
-      const response = await fetch("/api/clear", { method: "POST" });
-      const result = await response.json();
-      showStatus(result.message, result.ok ? "ok" : "error");
-      await refreshFiles();
+    downloadAllLink.addEventListener("click", () => {
+      setTimeout(async () => {
+        await refreshFiles();
+        await refreshOutputState();
+      }, 500);
     });
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       if (contractLocked) return;
       resetStatus();
-      const invoiceNumberCount = [...form.querySelectorAll("input[name='invoiceNumbers[]']")]
-        .filter((input) => input.value.trim()).length;
-      const invoiceFileCount = selectedFiles.invoiceFiles.length;
-      if (invoiceNumberCount !== invoiceFileCount) {
-        showStatus(`发票号数量必须和发票 PDF 数量一致。当前发票号 ${invoiceNumberCount} 个，发票 PDF ${invoiceFileCount} 个。`, "error");
+
+      const poNumber = document.querySelector("#poNumber").value.trim();
+      await refreshOutputState();
+      if (outputState.poNumbers.has(poNumber)) {
+        showStatus(`合同号重复：${poNumber}`, "error");
+        return;
+      }
+
+      if (!selectedFiles.invoiceFiles.length) {
+        showStatus("请至少添加一个发票 PDF。", "error");
         return;
       }
       if (!selectedFiles.deliveryFiles.length) {
         showStatus("请至少添加一个送货单 PDF。", "error");
         return;
       }
+
       const button = form.querySelector("button[type='submit']");
       button.disabled = true;
       button.textContent = "生成中...";
@@ -606,8 +581,10 @@
         const result = await response.json();
         showStatus(result.message + (result.fileName ? ` 文件：${result.fileName}` : ""), result.ok ? "ok" : "error");
         if (result.ok) {
-          setContractLocked(true);
           await refreshFiles();
+          await refreshOutputState();
+          moveToNextContract();
+          showStatus(result.message + (result.fileName ? ` 文件：${result.fileName}` : ""), "ok");
         }
       } catch (error) {
         showStatus(`生成失败：${error}`, "error");
@@ -616,6 +593,14 @@
         button.textContent = "生成递交 PDF";
       }
     });
+
+    async function deleteOutputFile(fileName) {
+      const response = await fetch(`/api/files/${encodeURIComponent(fileName)}`, { method: "DELETE" });
+      const result = await response.json();
+      showStatus(result.message, result.ok ? "ok" : "error");
+      await refreshFiles();
+      await refreshOutputState();
+    }
 
     async function refreshFiles() {
       const response = await fetch("/api/files");
@@ -627,16 +612,20 @@
         return;
       }
 
-      for (const fileName of result.files) {
-        const link = document.createElement("a");
-        link.className = "file-item";
-        link.href = `/output/${encodeURIComponent(fileName)}`;
-        link.textContent = fileName;
-        fileList.appendChild(link);
+      for (const file of result.files) {
+        const item = document.createElement("div");
+        item.className = "file-item";
+        item.innerHTML = `
+          <a class="file-link" href="/output/${encodeURIComponent(file.name)}">${file.name}</a>
+          <button class="remove" type="button" title="删除文件" aria-label="删除文件">×</button>
+        `;
+        item.querySelector("button").addEventListener("click", () => deleteOutputFile(file.name));
+        fileList.appendChild(item);
       }
     }
 
     refreshFiles();
+    refreshOutputState();
   </script>
 </body>
 </html>
